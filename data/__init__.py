@@ -6,6 +6,66 @@ little = lambda x: int.from_bytes(x, 'little')
 big = lambda x: int.from_bytes(x, 'big')
 
 
+class Components:
+    def __init__(self, parts, names=None):
+        if isinstance(parts, str) and len(parts) == 1:
+            self._parts = (parts,)
+            self._simple = True
+        else:
+            self._parts = parts
+            self._simple = False
+        if names is None:
+            self._names = (None,) * len(self._parts)
+        elif len(names) != len(self._parts):
+            raise ValueError('name count must match field count')
+        else:
+            self._names = tuple(names)
+
+
+    def group(self, name=None):
+        return Components((self,), (name,))
+
+
+    def named(self, name):
+        if len(self._parts) != 1:
+            raise ValueError("can't apply single name to multiple fields")
+        return Components(self._parts, (name,))
+
+
+    def with_names(self, names):
+        return Components(self._parts, names)
+
+
+    def __add__(self, other):
+        return Components(self._parts + other._parts, self._names + other._names)
+
+
+    def __mul__(self, count):
+        sp = self._parts
+        p = (f'{count}{sp[0]}',) if self._simple else count * (self,)
+        return Components(p)
+
+
+    def _indented(self, amount):
+        joiner = '\n' + ' ' * amount
+        fnames = (
+            f'{i}: ' if name is None else f'{name}: '
+            for i, name in enumerate(self._names)
+        )
+        return joiner.join(
+            name + (
+                part._indented(amount + len(name))
+                if isinstance(part, Components)
+                else repr(part)
+            )
+            for name, part in zip(fnames, self._parts)
+        )
+
+
+    def __repr__(self):
+        return self._indented(0)
+
+
 class Field(Enum):
     # size, format code, endian
     # names alluding to underlying format codes
@@ -81,8 +141,8 @@ class Field(Enum):
             return NotImplemented
         try:
             endian = {
-                '>?': '>', '<?': '<', 
-                '??': '?', '>>': '>', '<<': '<', 
+                '>?': '>', '<?': '<',
+                '??': '?', '>>': '>', '<<': '<',
                 '?>': '>', '?<': '<'
             }[self._endian + other._endian]
         except KeyError:
