@@ -70,6 +70,30 @@ class Field(Enum):
     T1 = (1, 's', '>')
 
 
+    def __init__(self, size, code, endian):
+        self._size = size
+        self._code = code
+        self._endian = endian
+
+
+    def __add__(self, other):
+        if not isinstance(other, Field):
+            return NotImplemented
+        try:
+            endian = {
+                '>?': '>', '<?': '<', 
+                '??': '?', '>>': '>', '<<': '<', 
+                '?>': '>', '?<': '<'
+            }[self._endian + other._endian]
+        except KeyError:
+            raise ValueError('endian conflict') from None
+        return DataSpec(endian, (self._code, other._code), ())
+
+
+    def __mul__(self, count):
+        return DataSpec(self._endian, (f'{count}{self._code}',), ())
+
+
 globals().update(Field.__members__)
 
 
