@@ -157,7 +157,17 @@ class Structure:
 
     @property
     def size(self):
-        return self._offset + self._padding + self.data_size
+        return self.offset + self.padding + self.data_size
+
+
+    @property
+    def offset(self):
+        return self._offset
+
+
+    @property
+    def padding(self):
+        return self._padding
 
 
     def group(self, name=None):
@@ -191,7 +201,7 @@ class Structure:
     def __str__(self):
         edesc = {'|': 'unknown', '<': 'little', '>': 'big'}[self._endian]
         endian = f'{edesc}-endian matcher for'
-        embed_info = f'(offset={self._offset}, padding={self._padding})'
+        embed_info = f'(offset={self.offset}, padding={self.padding})'
         if isinstance(self._components, Atom):
             return f'{endian} {self._components!r} (atomic) {embed_info}'
         shape_label = self._components.shapestr
