@@ -64,7 +64,7 @@ class Components(_ArrayElement):
 
     @property
     def element_size(self):
-        result = sum(p.size for p in self.parts)
+        return sum(p.size for p in self.parts)
 
 
     @property
@@ -81,17 +81,21 @@ class Components(_ArrayElement):
         return Components(self.parts, self.names, self.shape + (count,))
 
 
-    def _indented(self, amount):
-        joiner = '\n' + ' ' * amount
-        inames = (
-            str(i) if name is None else name for i, name in enumerate(self.names)
-        )
-        return self.shapestr + joiner + joiner.join(
-            f"{name}: {part._indented(amount + len(name) + 2)}"
-            if isinstance(part, Components)
-            else f'{name}: {part!r}'
-            for name, part in zip(inames, self.parts)
-        )
+    def _fields(self, amount, include_shapestr=True):
+        if include_shapestr:
+            yield self.shapestr
+        inames = [
+            str(i) if name is None else name
+            for i, name in enumerate(self.names)
+        ]
+        width = max(len(name) for name in inames)
+        for name, part in zip(inames, self.parts):
+            name = str(i) if name is None else name
+            yield f'{name:{width}}: {part._indented(amount + width + 2)}'
+
+
+    def _indented(self, amount, include_shapestr=True):
+        return ('\n' + ' ' * amount).join(self._fields(amount, include_shapestr))
 
 
     def __repr__(self):
@@ -114,6 +118,10 @@ class Atom(_ArrayElement):
             'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8, 'Q': 8,
             '?': 1, 'x': 1, 's': 1, 'e': 2, 'f': 4, 'd': 8
         }[self._typecode]
+
+
+    def _indented(self, _):
+        return repr(self)
 
 
     def __repr__(self):
@@ -167,7 +175,15 @@ class Structure:
 
 
     def __repr__(self):
-        return f'{self._endian}\n{self._components!r}'
+        edesc = {'|': 'unknown', '<': 'little', '>': 'big'}[self._endian]
+        endian_str = f'{edesc}-endian matcher for'
+        embed_info = f'(offset={self._offset}, padding={self._padding})'
+        if isinstance(self._components, Atom):
+            return f'{endian_str} {self._components!r} (atomic) {embed_info}'
+        else:
+            shape_label = self._components.shapestr
+            field_text = self._components._indented(0, False)
+            return f'{endian_str} structure{shape_label} {embed_info}:\n{field_text}'
 
 
 class Field(Structure, Enum):
