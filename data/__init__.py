@@ -2,21 +2,39 @@ from enum import Enum
 from struct import Struct
 
 
-def _normalize(x):
-    return x if (x.shape == () and not isinstance(x, Atom)) else Components((x,))
+class _ArrayElement:
+    def __init__(self, shape=()):
+        self._shape = shape
 
 
-def _add(x, y):
-    # each is either a Components or Atom,
-    # and may be scalar or array.
-    xn = _normalize(x)
-    yn = _normalize(y)
-    return Components(xn.parts + yn.parts, xn.names + yn.names)
+    def __add__(self, other):
+        x = self._normalize()
+        y = other._normalize()
+        return x.__class__(x.parts + y.parts, x.names + y.names)
 
 
-class Components:
+    @property
+    def size(self):
+        result = self.element_size
+        for dimension in self.shape:
+            result *= dimension
+        return result
+
+
+    @property
+    def shape(self):
+        return self._shape
+
+
+    @property
+    def shapestr(self):
+        return ''.join(f'[{s}]' for s in self.shape)
+
+
+class Components(_ArrayElement):
     # "parts" are either other Components, or Atoms.
     def __init__(self, parts, names=None, shape=()):
+        super().__init__(shape)
         self._parts = parts
         if names is None:
             self._names = (None,) * len(parts)
@@ -24,7 +42,10 @@ class Components:
             raise ValueError('name count must match field count')
         else:
             self._names = tuple(names)
-        self._shape = shape
+
+
+    def _normalize(self):
+        return self if self._shape == () else Components((self,))
 
 
     def group(self, name=None):
@@ -42,11 +63,8 @@ class Components:
 
 
     @property
-    def size(self):
+    def element_size(self):
         result = sum(p.size for p in self.parts)
-        for dimension in self._shape:
-            result *= dimension
-        return result
 
 
     @property
@@ -59,22 +77,8 @@ class Components:
         return self._names
 
 
-    @property
-    def shape(self):
-        return self._shape
-
-
-    def __add__(self, other):
-        return _add(self, other)
-
-
     def __mul__(self, count):
         return Components(self.parts, self.names, self.shape + (count,))
-
-
-    @property
-    def shapestr(self):
-        return ''.join(f'[{s}]' for s in self.shape)
 
 
     def _indented(self, amount):
@@ -94,40 +98,26 @@ class Components:
         return self._indented(0)
 
 
-class Atom:
+class Atom(_ArrayElement):
     def __init__(self, typecode, shape=()):
+        super().__init__(shape)
         self._typecode = typecode
-        self._shape = shape
+
+
+    def _normalize(self):
+        return Components((self,))
 
 
     @property
-    def shape(self):
-        return self._shape
-
-
-    @property
-    def shapestr(self):
-        return ''.join(f'[{s}]' for s in self.shape)
-
-
-    @property
-    def size(self):
-        result = {
+    def element_size(self):
+        return {
             'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8, 'Q': 8,
             '?': 1, 'x': 1, 's': 1, 'e': 2, 'f': 4, 'd': 8
-            # TODO
         }[self._typecode]
-        for dimension in self._shape:
-            result *= dimension
-        return result
 
 
     def __repr__(self):
         return f'{self._typecode}{self.shapestr}'
-
-
-    def __add__(self, other):
-        return _add(self, other)
 
 
     def __mul__(self, other):
