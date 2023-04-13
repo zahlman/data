@@ -95,7 +95,8 @@ class Components(_ArrayElement):
 
 
     def _indented(self, amount, include_shapestr=True):
-        return ('\n' + ' ' * amount).join(self._fields(amount, include_shapestr))
+        joiner = '\n' + (' ' * amount)
+        return joiner.join(self._fields(amount, include_shapestr))
 
 
     def __str__(self):
@@ -189,14 +190,13 @@ class Structure:
 
     def __str__(self):
         edesc = {'|': 'unknown', '<': 'little', '>': 'big'}[self._endian]
-        endian_str = f'{edesc}-endian matcher for'
+        endian = f'{edesc}-endian matcher for'
         embed_info = f'(offset={self._offset}, padding={self._padding})'
         if isinstance(self._components, Atom):
-            return f'{endian_str} {self._components!r} (atomic) {embed_info}'
-        else:
-            shape_label = self._components.shapestr
-            field_text = self._components._indented(0, False)
-            return f'{endian_str} structure{shape_label} {embed_info}:\n{field_text}'
+            return f'{endian} {self._components!r} (atomic) {embed_info}'
+        shape_label = self._components.shapestr
+        field_text = self._components._indented(0, False)
+        return f'{endian} structure{shape_label} {embed_info}:\n{field_text}'
 
 
 class Field(Structure, Enum):
