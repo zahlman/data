@@ -66,6 +66,46 @@ class Components:
         return self._indented(0)
 
 
+class Structure:
+    def __init__(self, components, endian='|', offset=0, padding=0):
+        self._offset = 0
+        self._padding = 0
+        self._components = components
+        self._endian = endian
+
+
+    def group(self, name=None):
+        return Structure(self._components.group(name), self._endian)
+
+
+    def named(self, name):
+        return Structure(self._components.named(name), self._endian)
+
+
+    def with_names(self, names):
+        return Structure(self._components.with_names(names), self._endian)
+
+
+    def __add__(self, other):
+        try:
+            endian = {
+                '>|': '>', '<|': '<',
+                '||': '|', '>>': '>', '<<': '<',
+                '|>': '>', '|<': '<'
+            }[self._endian + other._endian]
+        except KeyError:
+            raise ValueError('endian conflict') from None
+        return Structure(self._components + other._components, endian)
+
+
+    def __mul__(self, count):
+        return Structure(self._components * count, self._endian)
+
+
+    def __repr__(self):
+        return f'{self._endian}\n{self._components!r}'
+
+
 class Field(Enum):
     # size, format code, endian
     # names alluding to underlying format codes
