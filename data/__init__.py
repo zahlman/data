@@ -98,7 +98,7 @@ class Components(_ArrayElement):
         return ('\n' + ' ' * amount).join(self._fields(amount, include_shapestr))
 
 
-    def __repr__(self):
+    def __str__(self):
         return self._indented(0)
 
 
@@ -121,10 +121,10 @@ class Atom(_ArrayElement):
 
 
     def _indented(self, _):
-        return repr(self)
+        return str(self)
 
 
-    def __repr__(self):
+    def __str__(self):
         return f'{self._typecode}{self.shapestr}'
 
 
@@ -174,7 +174,7 @@ class Structure:
         return Structure(self._components * count, self._endian)
 
 
-    def __repr__(self):
+    def __str__(self):
         edesc = {'|': 'unknown', '<': 'little', '>': 'big'}[self._endian]
         endian_str = f'{edesc}-endian matcher for'
         embed_info = f'(offset={self._offset}, padding={self._padding})'
