@@ -125,7 +125,15 @@ class Atom(_ArrayElement):
 
 
     def __str__(self):
-        return f'{self._typecode}{self.shapestr}'
+        typename = {
+            'b': 'unsigned byte', 'B': 'signed byte',
+            'h': 'unsigned 2-bytes', 'H': 'signed 2-bytes',
+            'i': 'unsigned 4-bytes', 'I': 'signed 4-bytes',
+            'q': 'unsigned 8-bytes', 'Q': 'signed 8-bytes',
+            '?': 'bool', 'x': '<ignored>', 's': 'text',
+            'e': 'half-float', 'f': 'float', 'd': 'double'
+        }[self._typecode]
+        return f'{typename}{self.shapestr}'
 
 
     def __mul__(self, other):
@@ -142,8 +150,13 @@ class Structure:
 
 
     @property
+    def data_size(self):
+        return self._components.size
+
+
+    @property
     def size(self):
-        return self._offset + self._padding + self._components.size
+        return self._offset + self._padding + self.data_size
 
 
     def group(self, name=None):
