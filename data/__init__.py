@@ -6,20 +6,29 @@ little = lambda x: int.from_bytes(x, 'little')
 big = lambda x: int.from_bytes(x, 'big')
 
 
+def _normalize(x):
+    return x if (x.shape == () and not isinstance(x, Atom)) else Components((x,))
+
+
+def _add(x, y):
+    # each is either a Components or Atom,
+    # and may be scalar or array.
+    xn = _normalize(x)
+    yn = _normalize(y)
+    return Components(xn.parts + yn.parts, xn.names + yn.names)
+
+
 class Components:
-    def __init__(self, parts, names=None):
-        if isinstance(parts, str) and len(parts) == 1:
-            self._parts = (parts,)
-            self._simple = True
-        else:
-            self._parts = parts
-            self._simple = False
+    # "parts" are either other Components, or Atoms.
+    def __init__(self, parts, names=None, shape=()):
+        self._parts = parts
         if names is None:
-            self._names = (None,) * len(self._parts)
-        elif len(names) != len(self._parts):
+            self._names = (None,) * len(parts)
+        elif len(names) != len(parts):
             raise ValueError('name count must match field count')
         else:
             self._names = tuple(names)
+        self._shape = shape
 
 
     def group(self, name=None):
@@ -27,38 +36,61 @@ class Components:
 
 
     def named(self, name):
-        if len(self._parts) != 1:
+        if len(self.parts) != 1:
             raise ValueError("can't apply single name to multiple fields")
-        return Components(self._parts, (name,))
+        return Components(self.parts, (name,), self._shape)
 
 
     def with_names(self, names):
-        return Components(self._parts, names)
+        return Components(self.parts, names, self._shape)
+
+
+    @property
+    def size(self):
+        result = sum(p.size for p in self.parts)
+        for dimension in self._shape:
+            result *= dimension
+        return result
+
+
+    @property
+    def parts(self):
+        return self._parts
+
+
+    @property
+    def names(self):
+        return self._names
+
+
+    @property
+    def shape(self):
+        return self._shape
 
 
     def __add__(self, other):
-        return Components(self._parts + other._parts, self._names + other._names)
+        return _add(self, other)
 
 
     def __mul__(self, count):
-        sp = self._parts
-        p = (f'{count}{sp[0]}',) if self._simple else count * (self,)
-        return Components(p)
+        return Components(self.parts, self.names, self.shape + (count,))
+
+
+    @property
+    def shapestr(self):
+        return ''.join(f'[{s}]' for s in self.shape)
 
 
     def _indented(self, amount):
         joiner = '\n' + ' ' * amount
-        fnames = (
-            f'{i}: ' if name is None else f'{name}: '
-            for i, name in enumerate(self._names)
+        inames = (
+            str(i) if name is None else name for i, name in enumerate(self.names)
         )
-        return joiner.join(
-            name + (
-                part._indented(amount + len(name))
-                if isinstance(part, Components)
-                else repr(part)
-            )
-            for name, part in zip(fnames, self._parts)
+        return self.shapestr + joiner + joiner.join(
+            f"{name}: {part._indented(amount + len(name) + 2)}"
+            if isinstance(part, Components)
+            else f'{name}: {part!r}'
+            for name, part in zip(inames, self.parts)
         )
 
 
@@ -66,12 +98,57 @@ class Components:
         return self._indented(0)
 
 
+class Atom:
+    def __init__(self, typecode, shape=()):
+        self._typecode = typecode
+        self._shape = shape
+
+
+    @property
+    def shape(self):
+        return self._shape
+
+
+    @property
+    def shapestr(self):
+        return ''.join(f'[{s}]' for s in self.shape)
+
+
+    @property
+    def size(self):
+        result = {
+            'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8, 'Q': 8,
+            # TODO
+        }[self._typecode]
+        for dimension in self._shape:
+            result *= dimension
+        return result
+
+
+    def __repr__(self):
+        return f'{self._typecode}{self.shapestr}'
+
+
+    def __add__(self, other):
+        return _add(self, other)
+
+
+    def __mul__(self, other):
+        return Atom(self._typecode, self.shape + (other,))
+
+
 class Structure:
     def __init__(self, components, endian='|', offset=0, padding=0):
-        self._offset = 0
-        self._padding = 0
+        self._offset = offset
+        self._padding = padding
+        # a single Components or Atom, representing the struct members.
         self._components = components
         self._endian = endian
+
+
+    @property
+    def size(self):
+        return self._offset + self._padding + self._components.size
 
 
     def group(self, name=None):
