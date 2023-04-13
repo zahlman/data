@@ -170,16 +170,21 @@ class Structure:
         return self._padding
 
 
+    @property
+    def endian(self):
+        return self._endian
+
+
     def group(self, name=None):
-        return Structure(self._components.group(name), self._endian)
+        return Structure(self._components.group(name), self.endian)
 
 
     def named(self, name):
-        return Structure(self._components.named(name), self._endian)
+        return Structure(self._components.named(name), self.endian)
 
 
     def with_names(self, names):
-        return Structure(self._components.with_names(names), self._endian)
+        return Structure(self._components.with_names(names), self.endian)
 
 
     def __add__(self, other):
@@ -188,22 +193,22 @@ class Structure:
                 '>|': '>', '<|': '<',
                 '||': '|', '>>': '>', '<<': '<',
                 '|>': '>', '|<': '<'
-            }[self._endian + other._endian]
+            }[self.endian + other.endian]
         except KeyError:
             raise ValueError('endian conflict') from None
         return Structure(self._components + other._components, endian)
 
 
     def __mul__(self, count):
-        return Structure(self._components * count, self._endian)
+        return Structure(self._components * count, self.endian)
 
 
     def __str__(self):
-        edesc = {'|': 'unknown', '<': 'little', '>': 'big'}[self._endian]
+        edesc = {'|': 'unknown', '<': 'little', '>': 'big'}[self.endian]
         endian = f'{edesc}-endian matcher for'
         embed_info = f'(offset={self.offset}, padding={self.padding})'
         if isinstance(self._components, Atom):
-            return f'{endian} {self._components!r} (atomic) {embed_info}'
+            return f'{endian} {self._components} (atomic) {embed_info}'
         shape_label = self._components.shapestr
         field_text = self._components._indented(0, False)
         return f'{endian} structure{shape_label} {embed_info}:\n{field_text}'
