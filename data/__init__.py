@@ -2,10 +2,6 @@ from enum import Enum
 from struct import Struct
 
 
-little = lambda x: int.from_bytes(x, 'little')
-big = lambda x: int.from_bytes(x, 'big')
-
-
 def _normalize(x):
     return x if (x.shape == () and not isinstance(x, Atom)) else Components((x,))
 
@@ -118,6 +114,7 @@ class Atom:
     def size(self):
         result = {
             'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8, 'Q': 8,
+            '?': 1, 'x': 1, 's': 1, 'e': 2, 'f': 4, 'd': 8
             # TODO
         }[self._typecode]
         for dimension in self._shape:
@@ -183,7 +180,7 @@ class Structure:
         return f'{self._endian}\n{self._components!r}'
 
 
-class Field(Enum):
+class Field(Structure, Enum):
     # size, format code, endian
     # names alluding to underlying format codes
     # integers
@@ -248,72 +245,8 @@ class Field(Enum):
 
 
     def __init__(self, size, code, endian):
-        self._size = size
-        self._code = code
-        self._endian = endian
-
-
-    def __add__(self, other):
-        if not isinstance(other, Field):
-            return NotImplemented
-        try:
-            endian = {
-                '>?': '>', '<?': '<',
-                '??': '?', '>>': '>', '<<': '<',
-                '?>': '>', '?<': '<'
-            }[self._endian + other._endian]
-        except KeyError:
-            raise ValueError('endian conflict') from None
-        return DataSpec(endian, (self._code, other._code), ())
-
-
-    def __mul__(self, count):
-        return DataSpec(self._endian, (f'{count}{self._code}',), ())
+        super().__init__(Atom(code), endian)
+        assert self.size == size
 
 
 globals().update(Field.__members__)
-
-
-class DataSpec:
-    def __init__(self, endian, codes, grouping):
-        self._endian = endian
-        self._codes = codes
-        self._grouping = grouping
-        self._packers = {}
-
-
-    def unpack_from(self, source, endian='|'):
-        if endian == '|':
-            endian = self._endian
-        data = self._packer(endian).unpack_from(source)
-        for start, stop in self._grouping:
-            # Make nested tuples as appropriate. TODO
-            data[start:stop] = (data[start:stop],)
-        return data
-
-
-    def _packer(self, endian):
-        if endian not in '<>':
-            raise ValueError('endian not determined')
-        if endian not in self._packers:
-            self._packers[endian] = Struct(endian + ''.join(self._codes))
-            # struct.error should be prevented by prior data sanitization.
-        return self._packers[endian]
-
-
-    @property
-    def little(self):
-        """Like .struct but enforcing little-endian."""
-        return self._packer('<')
-
-
-    @property
-    def big(self):
-        """Like .struct but enforcing big-endian."""
-        return self._packer('>')
-
-
-    @property
-    def struct(self):
-        """A struct.Struct representing the fields, without padding."""
-        return self._packer(self._endian)
